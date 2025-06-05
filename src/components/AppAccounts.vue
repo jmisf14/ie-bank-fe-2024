@@ -6,20 +6,26 @@
           <h1>Accounts</h1>
           <hr />
           <br />
-          <!-- Allert Message -->
+          <!-- Alert Message -->
           <b-alert v-if="showMessage" variant="success" show>{{
             message
           }}</b-alert>
           <!-- b-alert v-if="error" variant="danger" show>{{ error }}</b-alert-->
 
-          <button
-            type="button"
-            class="btn btn-success btn-sm"
-            v-b-modal.account-modal
-          >
-            Create Account
-          </button>
-          <br /><br />
+          <div class="d-flex justify-content-between align-items-center mb-3">
+             <button
+              type="button"
+              class="btn btn-success btn-sm"
+              v-b-modal.account-modal
+            >
+              Create Account
+            </button>
+             <b-form-input
+               v-model="searchQuery"
+               placeholder="Search accounts..." size="sm" class="w-25"
+             ></b-form-input>
+          </div>
+
           <table class="table table-hover">
             <thead>
               <tr>
@@ -27,16 +33,22 @@
                 <th scope="col">Account Number</th>
                 <th scope="col">Account Balance</th>
                 <th scope="col">Account Currency</th>
+                <th scope="col">Account Country</th>
                 <th scope="col">Account Status</th>
                 <th scope="col">Actions</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="account in accounts" :key="account.id">
-                <td>{{ account.name }}</td>
+              <tr v-for="account in filteredAccounts" :key="account.id">
+                <td>
+                  <router-link :to="{ name: 'AccountDetails', params: { id: account.id }}">
+                    {{ account.name }}
+                  </router-link>
+                </td>
                 <td>{{ account.account_number }}</td>
                 <td>{{ account.balance }}</td>
                 <td>{{ account.currency }}</td>
+                <td>{{ account.country }}</td>
                 <td>
                   <span
                     v-if="account.status == 'Active'"
@@ -66,6 +78,9 @@
                     </button>
                   </div>
                 </td>
+              </tr>
+              <tr v-if="filteredAccounts.length === 0">
+                 <td colspan="7" class="text-center">No accounts found.</td>
               </tr>
             </tbody>
           </table>
@@ -110,8 +125,27 @@
             >
             </b-form-input>
           </b-form-group>
+          <b-form-group
+            id="form-country-group"
+            label="Country:"
+            label-for="form-country-input"
+            :state="validationState(createAccountForm.country)"
+          >
+            <b-form-input
+              id="form-country-input"
+              type="text"
+              v-model="createAccountForm.country"
+              placeholder="e.g. ES or US"
+              :state="validationState(createAccountForm.country)"
+              required
+            >
+            </b-form-input>
+             <b-form-invalid-feedback :state="validationState(createAccountForm.country)">
+                Country code must be 2 letters.
+             </b-form-invalid-feedback>
+          </b-form-group>
 
-          <b-button type="submit" variant="outline-info">Submit</b-button>
+          <b-button type="submit" variant="outline-info" :disabled="!isCreateFormValid">Submit</b-button>
         </b-form>
       </b-modal>
       <!-- End of Modal for Create Account-->
@@ -138,7 +172,26 @@
             >
             </b-form-input>
           </b-form-group>
-          <b-button type="submit" variant="outline-info">Update</b-button>
+          <b-form-group
+            id="form-edit-country-group"
+            label="Country:"
+            label-for="form-edit-country-input"
+             :state="validationState(editAccountForm.country)"
+          >
+            <b-form-input
+              id="form-edit-country-input"
+              type="text"
+              v-model="editAccountForm.country"
+              placeholder="e.g. ES or US"
+              :state="validationState(editAccountForm.country)"
+              required
+            >
+            </b-form-input>
+             <b-form-invalid-feedback :state="validationState(editAccountForm.country)">
+                Country code must be 2 letters.
+             </b-form-invalid-feedback>
+          </b-form-group>
+          <b-button type="submit" variant="outline-info" :disabled="!isEditFormValid">Update</b-button>
         </b-form>
       </b-modal>
       <!-- End of Modal for Edit Account-->
@@ -156,14 +209,43 @@ export default {
       createAccountForm: {
         name: "",
         currency: "",
+        country: "",
       },
       editAccountForm: {
         id: "",
         name: "",
+        country: "",
       },
       showMessage: false,
       message: "",
+      searchQuery: "",
     };
+  },
+  computed: {
+    filteredAccounts() {
+      if (!this.searchQuery) {
+        return this.accounts;
+      }
+      const query = this.searchQuery.toLowerCase();
+      return this.accounts.filter(account => {
+        return (
+          account.name.toLowerCase().includes(query) ||
+          account.account_number.toLowerCase().includes(query) ||
+          account.currency.toLowerCase().includes(query) ||
+          account.country.toLowerCase().includes(query) ||
+          account.status.toLowerCase().includes(query)
+        );
+      });
+    },
+    isCreateFormValid() {
+      return this.createAccountForm.name.length > 0 &&
+             this.createAccountForm.currency.length > 0 &&
+             this.validationState(this.createAccountForm.country) === true;
+    },
+    isEditFormValid() {
+         return this.editAccountForm.name.length > 0 &&
+                this.validationState(this.editAccountForm.country) === true;
+    }
   },
   methods: {
     /***************************************************
@@ -253,40 +335,58 @@ export default {
      * FORM MANAGEMENT
      * *************************************************/
 
+     // Frontend validation for 2-letter country code
+     validationState(country) {
+        if (country === null || country === undefined || country.length === 0) {
+            return null; // No input yet
+        }
+        return country.length === 2 && /^[a-zA-Z]+$/.test(country);
+     },
+
     // Initialize forms empty
     initForm() {
       this.createAccountForm.name = "";
       this.createAccountForm.currency = "";
+      this.createAccountForm.country = "";
       this.editAccountForm.id = "";
       this.editAccountForm.name = "";
+      this.editAccountForm.country = "";
     },
 
     // Handle submit event for create account
     onSubmit(e) {
       e.preventDefault(); //prevent default form submit form the browser
-      this.$refs.addAccountModal.hide(); //hide the modal when submitted
-      const payload = {
-        name: this.createAccountForm.name,
-        currency: this.createAccountForm.currency,
-      };
-      this.RESTcreateAccount(payload);
-      this.initForm();
+       if (this.isCreateFormValid) {
+            this.$refs.addAccountModal.hide(); //hide the modal when submitted
+            const payload = {
+              name: this.createAccountForm.name,
+              currency: this.createAccountForm.currency,
+              country: this.createAccountForm.country, // Include country in the payload
+            };
+            this.RESTcreateAccount(payload);
+            this.initForm();
+       }
     },
 
     // Handle submit event for edit account
     onSubmitUpdate(e) {
       e.preventDefault(); //prevent default form submit form the browser
-      this.$refs.editAccountModal.hide(); //hide the modal when submitted
-      const payload = {
-        name: this.editAccountForm.name,
-      };
-      this.RESTupdateAccount(payload, this.editAccountForm.id);
-      this.initForm();
+       if(this.isEditFormValid) {
+            this.$refs.editAccountModal.hide(); //hide the modal when submitted
+            const payload = {
+              name: this.editAccountForm.name,
+              country: this.editAccountForm.country,
+            };
+            this.RESTupdateAccount(payload, this.editAccountForm.id);
+            this.initForm();
+       }
     },
 
     // Handle edit button
     editAccount(account) {
-      this.editAccountForm = account;
+      this.editAccountForm.id = account.id;
+      this.editAccountForm.name = account.name;
+      this.editAccountForm.country = account.country;
     },
 
     // Handle Delete button
