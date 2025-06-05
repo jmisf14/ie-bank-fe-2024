@@ -1,0 +1,40 @@
+name: Deploy Frontend to UAT
+
+on:
+  push:
+    branches:
+      - "main"
+    paths:
+      - "ie-bank-fe-2024/**"
+
+env:
+  AZURE_WEBAPP_NAME: jserrano-iebank-uat-fe
+  AZURE_WEBAPP_PACKAGE_PATH: "dist"
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: "16"
+
+      - name: Install dependencies
+        run: |
+          cd ie-bank-fe-2024
+          npm ci
+
+      - name: Build
+        run: |
+          cd ie-bank-fe-2024
+          npm run build
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          package: ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
